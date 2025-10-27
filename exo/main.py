@@ -83,6 +83,7 @@ parser.add_argument("--discovery-timeout", type=int, default=30, help="Discovery
 parser.add_argument("--discovery-config-path", type=str, default=None, help="Path to discovery config json file")
 parser.add_argument("--wait-for-peers", type=int, default=0, help="Number of peers to wait to connect to before starting")
 parser.add_argument("--chatgpt-api-port", type=int, default=52415, help="ChatGPT API port")
+parser.add_argument("--chatgpt-api-host", type=str, default="0.0.0.0", help="ChatGPT API host interface to bind")
 parser.add_argument("--chatgpt-api-response-timeout", type=int, default=900, help="ChatGPT API response timeout in seconds")
 parser.add_argument("--max-generate-tokens", type=int, default=10000, help="Max tokens to generate in each request")
 parser.add_argument("--inference-engine", type=str, default=None, help="Inference engine to use (mlx, tinygrad, or dummy)")
@@ -132,6 +133,9 @@ if DEBUG >= 0:
   for web_chat_url in web_chat_urls:
     print(f" - {terminal_link(web_chat_url)}")
   print("ChatGPT API endpoint served at:")
+  # If a specific host was provided for the API, prefer printing that explicitly
+  if args.chatgpt_api_host and args.chatgpt_api_host != "0.0.0.0":
+    print(f" - {terminal_link(f'http://{args.chatgpt_api_host}:{args.chatgpt_api_port}')} (explicit host)")
   for chatgpt_api_endpoint in chatgpt_api_endpoints:
     print(f" - {terminal_link(chatgpt_api_endpoint)}")
 
@@ -384,7 +388,7 @@ async def main():
       await train_model_cli(node, model_name, dataloader, args.batch_size, args.iters, save_interval=args.save_every, checkpoint_dir=args.save_checkpoint_dir)
 
   else:
-    asyncio.create_task(api.run(port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
+    asyncio.create_task(api.run(host=args.chatgpt_api_host, port=args.chatgpt_api_port))  # Start the API server as a non-blocking task
     await asyncio.Event().wait()
 
   if args.wait_for_peers > 0:

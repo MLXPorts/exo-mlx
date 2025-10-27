@@ -4,6 +4,8 @@ import socket
 import time
 import traceback
 from typing import List, Dict, Callable, Tuple, Coroutine, Optional
+import psutil
+import ipaddress
 from exo.networking.discovery import Discovery
 from exo.networking.peer_handle import PeerHandle
 from exo.topology.device_capabilities import DeviceCapabilities, device_capabilities, UNKNOWN_DEVICE_CAPABILITIES
@@ -24,12 +26,31 @@ class ListenProtocol(asyncio.DatagramProtocol):
 
 
 def get_broadcast_address(ip_addr: str) -> str:
+  """Return the correct broadcast address for the interface that owns ip_addr.
+
+  Falls back to 255.255.255.255 if no mask/broadcast info is available.
+  This fixes link-local (/16) and other non-/24 subnets.
+  """
   try:
-    # Split IP into octets and create broadcast address for the subnet
-    ip_parts = ip_addr.split('.')
-    return f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}.255"
-  except:
-    return "255.255.255.255"
+    for ifname, addrs in psutil.net_if_addrs().items():
+      for a in addrs:
+        if a.family == socket.AF_INET and a.address == ip_addr:
+          # Prefer OS-provided broadcast
+          if getattr(a, 'broadcast', None):
+            return a.broadcast
+          # Compute from netmask if available
+          if getattr(a, 'netmask', None):
+            try:
+              net = ipaddress.IPv4Network(f"{ip_addr}/{a.netmask}", strict=False)
+              return str(net.broadcast_address)
+            except Exception:
+              pass
+          # As a last resort, global broadcast
+          return "255.255.255.255"
+  except Exception:
+    pass
+  # Default fallback
+  return "255.255.255.255"
 
 
 class BroadcastProtocol(asyncio.DatagramProtocol):
@@ -43,9 +64,17 @@ class BroadcastProtocol(asyncio.DatagramProtocol):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     # Try both subnet-specific and global broadcast
     broadcast_addr = get_broadcast_address(self.source_ip)
-    transport.sendto(self.message.encode("utf-8"), (broadcast_addr, self.broadcast_port))
+    try:
+      transport.sendto(self.message.encode("utf-8"), (broadcast_addr, self.broadcast_port))
+    except Exception as e:
+      if DEBUG_DISCOVERY >= 2:
+        print(f"Broadcast send failed to {broadcast_addr}:{self.broadcast_port} from {self.source_ip}: {e}")
     if broadcast_addr != "255.255.255.255":
-      transport.sendto(self.message.encode("utf-8"), ("255.255.255.255", self.broadcast_port))
+      try:
+        transport.sendto(self.message.encode("utf-8"), ("255.255.255.255", self.broadcast_port))
+      except Exception as e:
+        if DEBUG_DISCOVERY >= 2:
+          print(f"Broadcast send failed to 255.255.255.255:{self.broadcast_port} from {self.source_ip}: {e}")
 
 
 class UDPDiscovery(Discovery):
