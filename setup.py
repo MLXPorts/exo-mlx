@@ -28,6 +28,7 @@ install_requires = [
   "tqdm>=4.66.0",
   "uuid>=1.30",
   "uvloop>=0.21.0",
+  "zeroconf>=0.132.0",
 ]
 
 extras_require = {
