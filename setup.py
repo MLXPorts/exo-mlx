@@ -15,7 +15,7 @@ install_requires = [
   "Jinja2>=3.1.0",
   "mlx @ git+https://github.com/SolaceHarmony/mlx-precise@main",
   "mlx-lm>=0.21.1",
-  "opencv @ git+https://github.com/SolaceHarmony/opencv-mlx@4.x",
+  "opencv @ git+https://github.com/SolaceHarmony/opencv-mlx@4.x#subdirectory=modules/python/package",
   "pillow>=10.4.0",
   "prometheus-client>=0.20.0",
   "protobuf>=5.28.0",
