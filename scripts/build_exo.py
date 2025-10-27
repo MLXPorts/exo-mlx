@@ -26,7 +26,7 @@ def run():
         command.extend([
             "--macos-app-name=exo",
             "--macos-app-mode=gui",
-            "--macos-app-version=0.0.1",
+            "--macos-app-version=0.0.2",
             "--macos-signed-app-name=net.exolabs.exo",
             "--include-distribution-meta=mlx",
             "--include-module=mlx._reprlib_fix",
@@ -46,8 +46,8 @@ def run():
     elif sys.platform == "win32":  
         command.extend([
             "--windows-icon-from-ico=docs/exo-logo-win.ico",
-            "--file-version=0.0.1",
-            "--product-version=0.0.1"
+            "--file-version=0.0.2",
+            "--product-version=0.0.2"
         ])
     elif sys.platform.startswith("linux"):  
         command.extend([
