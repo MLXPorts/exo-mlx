@@ -36,6 +36,44 @@ exo: Run your own AI cluster at home with everyday devices. Maintained by [exo l
 
 ---
 
+## exo-mlx: MLX-Native, NumPy-Free, GIL-Free Fork
+
+> **This is a specialized fork of exo focused on Apple Silicon with Python 3.14 free-threading support.**
+>
+> **Key Differences from Upstream:**
+> - **MLX-Native:** All inference runs on [mlx-precise](https://github.com/SolaceHarmony/mlx-precise) with true double-precision math
+> - **NumPy-Free:** Complete removal of NumPy dependency for zero-copy tensor operations
+> - **GIL-Free:** Built for Python 3.14+ free-threading with [grpc-mlx](https://github.com/SolaceHarmony/grpc-mlx) (Cython free-threading support)
+> - **Apple Silicon Only:** Optimized exclusively for M1/M2/M3/M4 with Metal acceleration
+> - **Interdependent Fork Ecosystem:** Uses [opencv-mlx](https://github.com/SolaceHarmony/opencv-mlx) for MLX-native computer vision
+
+**Requirements:**
+- **Python 3.14 or later** (required for free-threading)
+- **Apple Silicon Mac** (M1/M2/M3/M4)
+- **macOS 11.0+**
+
+**Installation:**
+```bash
+# Ensure Python 3.14 free-threading build
+python --version  # Should show Python 3.14.0 or later
+
+# Install from source
+git clone https://github.com/SolaceHarmony/exo-mlx
+cd exo-mlx
+pip install -e .
+
+# Run with GIL disabled
+PYTHON_GIL=0 exo
+```
+
+**Fork Ecosystem:**
+All dependencies use our free-threading compatible forks:
+- [mlx-precise](https://github.com/SolaceHarmony/mlx-precise) - True double-precision MLX
+- [grpc-mlx](https://github.com/SolaceHarmony/grpc-mlx) - Free-threading gRPC
+- [opencv-mlx](https://github.com/SolaceHarmony/opencv-mlx) - MLX-native computer vision
+
+---
+
 --ify your existing devices into one powerful GPU: iPhone, iPad, Android, Mac, NVIDIA, Raspberry Pi, pretty much any device!
 
 <div align="center">
