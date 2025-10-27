@@ -8,6 +8,12 @@ import os
 import time
 import traceback
 import uuid
+
+# IMPORTANT: Set gRPC verbosity BEFORE importing any grpc modules
+os.environ["GRPC_VERBOSITY"] = "error"
+os.environ["GRPC_TRACE"] = ""
+os.environ["GRPC_VERBOSITY_LEVEL"] = "ERROR"
+
 import numpy as np
 from tqdm import tqdm
 from exo.train.dataset import load_dataset, iterate_batches
@@ -33,8 +39,6 @@ import concurrent.futures
 import resource
 import psutil
 
-# TODO: figure out why this is happening
-os.environ["GRPC_VERBOSITY"] = "error"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
