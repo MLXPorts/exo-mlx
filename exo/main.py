@@ -18,6 +18,7 @@ import numpy as np
 from tqdm import tqdm
 from exo.train.dataset import load_dataset, iterate_batches
 from exo.networking.manual.manual_discovery import ManualDiscovery
+from exo.networking.direct.direct_discovery import DirectDiscovery
 from exo.orchestration.node import Node
 from exo.networking.grpc.grpc_server import GRPCServer
 from exo.networking.udp.udp_discovery import UDPDiscovery
@@ -78,9 +79,12 @@ parser.add_argument("--listen-port", type=int, default=5678, help="Listening por
 parser.add_argument("--download-quick-check", action="store_true", help="Quick check local path for model shards download")
 parser.add_argument("--max-parallel-downloads", type=int, default=8, help="Max parallel downloads for model shards download")
 parser.add_argument("--broadcast-port", type=int, default=5678, help="Broadcast port for discovery")
-parser.add_argument("--discovery-module", type=str, choices=["udp", "tailscale", "manual"], default="udp", help="Discovery module to use")
+parser.add_argument("--discovery-module", type=str, choices=["udp", "tailscale", "manual", "direct"], default="udp", help="Discovery module to use")
 parser.add_argument("--discovery-timeout", type=int, default=30, help="Discovery timeout in seconds")
 parser.add_argument("--discovery-config-path", type=str, default=None, help="Path to discovery config json file")
+parser.add_argument("--peer-host", type=str, default=None, help="Direct peer host IP address (for direct discovery)")
+parser.add_argument("--peer-port", type=int, default=None, help="Direct peer port (for direct discovery)")
+parser.add_argument("--peer-id", type=str, default=None, help="Direct peer ID (for direct discovery, auto-generated if not provided)")
 parser.add_argument("--wait-for-peers", type=int, default=0, help="Number of peers to wait to connect to before starting")
 parser.add_argument("--chatgpt-api-port", type=int, default=52415, help="ChatGPT API port")
 parser.add_argument("--chatgpt-api-host", type=str, default="0.0.0.0", help="ChatGPT API host interface to bind")
@@ -168,6 +172,15 @@ elif args.discovery_module == "manual":
   if not args.discovery_config_path:
     raise ValueError(f"--discovery-config-path is required when using manual discovery. Please provide a path to a config json file.")
   discovery = ManualDiscovery(args.discovery_config_path, args.node_id, create_peer_handle=lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities))
+elif args.discovery_module == "direct":
+  if not args.peer_host or not args.peer_port:
+    raise ValueError(f"--peer-host and --peer-port are required when using direct discovery. Example: --peer-host 169.254.100.10 --peer-port 50051")
+  discovery = DirectDiscovery(
+    args.peer_host,
+    args.peer_port,
+    args.peer_id,
+    create_peer_handle=lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities)
+  )
 topology_viz = TopologyViz(chatgpt_api_endpoints=chatgpt_api_endpoints, web_chat_urls=web_chat_urls) if not args.disable_tui else None
 node = Node(
   args.node_id,
