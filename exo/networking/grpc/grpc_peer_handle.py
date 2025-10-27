@@ -1,5 +1,4 @@
 import grpc
-import numpy as np
 import asyncio
 from typing import Optional, Tuple, List
 
@@ -8,16 +7,12 @@ from . import node_service_pb2_grpc
 
 from ..peer_handle import PeerHandle
 from exo.inference.shard import Shard
+from exo.inference.mlx_array import MLXArray, array_from_bytes
 from exo.topology.topology import Topology
 from exo.topology.device_capabilities import DeviceCapabilities, DeviceFlops
 from exo.helpers import DEBUG
 import json
 import platform
-
-if platform.system().lower() == "darwin" and platform.machine().lower() == "arm64":
-  import mlx.core as mx
-else:
-  import numpy as mx
 
 
 class GRPCPeerHandle(PeerHandle):
@@ -97,7 +92,7 @@ class GRPCPeerHandle(PeerHandle):
         traceback.print_exc()
       return False
 
-  async def send_prompt(self, shard: Shard, prompt: str, inference_state: Optional[dict] = None, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_prompt(self, shard: Shard, prompt: str, inference_state: Optional[dict] = None, request_id: Optional[str] = None) -> Optional[MLXArray]:
     await self._ensure_connected()
     request = node_service_pb2.PromptRequest(
       prompt=prompt,
@@ -112,7 +107,7 @@ class GRPCPeerHandle(PeerHandle):
     )
     await self.stub.SendPrompt(request)
 
-  async def send_tensor(self, shard: Shard, tensor: np.ndarray, inference_state: Optional[dict] = None, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_tensor(self, shard: Shard, tensor: MLXArray, inference_state: Optional[dict] = None, request_id: Optional[str] = None) -> Optional[MLXArray]:
     await self._ensure_connected()
     request = node_service_pb2.TensorRequest(
       shard=node_service_pb2.Shard(
@@ -130,9 +125,9 @@ class GRPCPeerHandle(PeerHandle):
     if not response.tensor_data or not response.shape or not response.dtype:
       return None
 
-    return np.frombuffer(response.tensor_data, dtype=np.dtype(response.dtype)).reshape(response.shape)
+    return array_from_bytes(response.tensor_data, shape=tuple(response.shape), dtype=response.dtype)
 
-  async def send_example(self, shard: Shard, example: np.ndarray, target: np.ndarray, length: np.ndarray, train: bool, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_example(self, shard: Shard, example: MLXArray, target: MLXArray, length: MLXArray, train: bool, request_id: Optional[str] = None) -> Optional[MLXArray]:
     await self._ensure_connected()
     request = node_service_pb2.ExampleRequest(
       shard=node_service_pb2.Shard(
@@ -150,12 +145,12 @@ class GRPCPeerHandle(PeerHandle):
     response = await self.stub.SendExample(request)
     loss = response.loss
     if train and not shard.is_first_layer():
-      grads = np.frombuffer(response.grads.tensor_data, dtype=np.dtype(response.grads.dtype)).reshape(response.grads.shape)
+      grads = array_from_bytes(response.grads.tensor_data, shape=tuple(response.grads.shape), dtype=response.grads.dtype)
       return loss, grads
     else:
       return loss
 
-  async def send_loss(self, shard: Shard, tensor: np.ndarray, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_loss(self, shard: Shard, tensor: MLXArray, request_id: Optional[str] = None) -> Optional[MLXArray]:
     await self._ensure_connected()
     request = node_service_pb2.TensorRequest(
       shard=node_service_pb2.Shard(

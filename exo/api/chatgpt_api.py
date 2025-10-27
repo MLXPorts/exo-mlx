@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
-from transformers import AutoTokenizer
+from mlx_lm import load
 from typing import List, Literal, Union, Dict, Optional
 from aiohttp import web
 import aiohttp_cors
@@ -17,20 +17,15 @@ from exo.orchestration import Node
 from exo.models import build_base_shard, build_full_shard, model_cards, get_repo, get_supported_models, get_pretty_name
 from typing import Callable, Optional
 from PIL import Image
-import numpy as np
 import base64
 from io import BytesIO
 import platform
 from exo.download.download_progress import RepoProgressEvent
 from exo.download.new_shard_download import delete_model
+from exo.inference.mlx_array import MLXArray
 import tempfile
 from exo.apputil import create_animation_mp4
 from collections import defaultdict
-
-if platform.system().lower() == "darwin" and platform.machine().lower() == "arm64":
-  import mlx.core as mx
-else:
-  import numpy as mx
 
 
 class Message:

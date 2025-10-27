@@ -1,13 +1,13 @@
-import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
 from mlx_lm.sample_utils import make_sampler
 import mlx.optimizers as optim
 from ..inference_engine import InferenceEngine
+from ..mlx_array import MLXArray, ensure_mlx_array, eval_async
 from .sharded_utils import load_model_shard, resolve_tokenizer
 from .losses import loss_fns
 from ..shard import Shard
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union, List
 from exo.download.shard_download import ShardDownloader
 import asyncio
 from collections import OrderedDict
@@ -39,33 +39,44 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
       self.caches[request_id] = newcache
     return {"cache": self.caches[request_id]}
 
-  async def sample(self, x: np.ndarray, temp: float = 0.0, top_p: float = 1.0) -> np.ndarray:
+  async def sample(self, x: MLXArray, temp: float = 0.0, top_p: float = 1.0) -> MLXArray:
     if (temp, top_p, 0.0, 1) != self.sampler_params:
       self.sampler_params = (temp, top_p, 0.0, 1)
       self.sampler = make_sampler(*self.sampler_params)
-    logits = mx.array(x)
+
+    # x is already an MLXArray, extract the underlying mlx array
+    logits = x.data if isinstance(x, MLXArray) else mx.array(x)
     logits = logits[:, -1, :]
     logprobs = logits - mx.logsumexp(logits, keepdims=True)
     result = self.sampler(logprobs)
     await self._eval_mlx(result)
-    return np.asarray(result, dtype=int)
+    return MLXArray(result)
 
-  async def encode(self, shard: Shard, prompt: str) -> np.ndarray:
+  async def encode(self, shard: Shard, prompt: str) -> MLXArray:
     await self.ensure_shard(shard)
-    return np.asarray(
-      await asyncio.get_running_loop().run_in_executor(
-        self._tokenizer_thread,
-        self.tokenizer.encode,
-        prompt
-      )
+    tokens = await asyncio.get_running_loop().run_in_executor(
+      self._tokenizer_thread,
+      self.tokenizer.encode,
+      prompt
     )
+    return MLXArray(tokens)
 
-  async def decode(self, shard: Shard, tokens) -> str:
+  async def decode(self, shard: Shard, tokens: Union[MLXArray, List]) -> str:
     await self.ensure_shard(shard)
+    # Extract tokens if MLXArray
+    if isinstance(tokens, MLXArray):
+      # Convert to list for tokenizer
+      if hasattr(tokens.data, 'tolist'):
+        token_list = tokens.data.tolist()
+      else:
+        token_list = list(tokens.data)
+    else:
+      token_list = tokens
+
     return await asyncio.get_running_loop().run_in_executor(
       self._tokenizer_thread,
       self.tokenizer.decode,
-      tokens
+      token_list
     )
 
   async def save_checkpoint(self, shard: Shard, path: str):
@@ -76,10 +87,12 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     await self.ensure_shard(shard)
     await asyncio.get_running_loop().run_in_executor(self._mlx_thread, lambda: self.model.load_weights(path))
 
-  async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[dict] = None) -> tuple[np.ndarray, Optional[dict]]:
+  async def infer_tensor(self, request_id: str, shard: Shard, input_data: MLXArray, inference_state: Optional[dict] = None) -> tuple[MLXArray, Optional[dict]]:
     await self.ensure_shard(shard)
     state = await self.poll_state(request_id) if self.model.model_type != 'StableDiffusionPipeline' else {}
-    x = mx.array(input_data)
+
+    # Extract underlying MLX array
+    x = input_data.data if isinstance(input_data, MLXArray) else mx.array(input_data)
 
     if self.model.model_type != 'StableDiffusionPipeline':
       output_data = await asyncio.get_running_loop().run_in_executor(
@@ -95,11 +108,8 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
       output_data, inference_state = result
 
     await self._eval_mlx(output_data)
-    output_data = await asyncio.get_running_loop().run_in_executor(
-      self._mlx_thread,
-      lambda: np.array(output_data, copy=False)
-    )
-    return output_data, inference_state
+    # Return MLXArray directly - no numpy conversion!
+    return MLXArray(output_data), inference_state
 
   async def evaluate(self, request_id: str, shard: Shard, inputs, targets, lengths, loss: str = "length_masked_ce"):
     await self.ensure_shard(shard)
@@ -153,9 +163,9 @@ class MLXDynamicShardInferenceEngine(InferenceEngine):
     await self._eval_mlx(*eval_args)
 
     layers = [{k: v["weight"] for k, v in layer.items() if 'weight' in v} for layer in gradients if layer]
-    first_layer = np.array(layers[0]['input_layernorm'], copy=False)
+    first_layer = layers[0]['input_layernorm']  # Keep as MLX array
     await self._eval_mlx(first_layer)
-    return score, first_layer
+    return score, MLXArray(first_layer)
 
   async def ensure_shard(self, shard: Shard):
     async with self._shard_lock:

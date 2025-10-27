@@ -16,7 +16,7 @@ import traceback
 
 import mlx.core as mx
 import mlx.nn as nn
-from transformers import AutoProcessor
+from mlx_lm import load
 
 from mlx_lm.tokenizer_utils import load_tokenizer, TokenizerWrapper
 
@@ -196,9 +196,11 @@ async def load_shard(
 
   # TODO: figure out a generic solution
   if model.model_type == "llava":
-    processor = AutoProcessor.from_pretrained(model_path)
-    processor.eos_token_id = processor.tokenizer.eos_token_id
-    processor.encode = processor.tokenizer.encode
+    # Load processor using MLX-LM's tokenizer utilities
+    processor = load_tokenizer(model_path)
+    if hasattr(processor, 'tokenizer'):
+      processor.eos_token_id = processor.tokenizer.eos_token_id
+      processor.encode = processor.tokenizer.encode
     return model, processor
   elif hasattr(model, "tokenizer"):
     tokenizer = model.tokenizer

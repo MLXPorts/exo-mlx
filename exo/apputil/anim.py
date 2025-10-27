@@ -1,8 +1,16 @@
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import os
-import numpy as np
-import cv2
 import sys
+
+# Optional dependencies for video creation (not needed for core MLX inference)
+try:
+    import numpy as np
+    import cv2
+    VIDEO_CREATION_AVAILABLE = True
+except ImportError:
+    VIDEO_CREATION_AVAILABLE = False
+    np = None
+    cv2 = None
 
 def draw_rounded_rectangle(draw, coords, radius, fill):
   left, top, right, bottom = coords
@@ -73,6 +81,9 @@ def create_animation_mp4(
   device_coords=(1240, 370, 1640, 416),
   prompt_coords=(332, 1702, 2662, 1745)
 ):
+  if not VIDEO_CREATION_AVAILABLE:
+    print("Video creation not available (opencv-python not installed)")
+    return
   frames = []
   try:
     font = ImageFont.truetype("/System/Library/Fonts/SFNSMono.ttf", 20)

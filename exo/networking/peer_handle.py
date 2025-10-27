@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, List
-import numpy as np
+from exo.inference.mlx_array import MLXArray
 from exo.inference.shard import Shard
 from exo.topology.device_capabilities import DeviceCapabilities
 from exo.topology.topology import Topology
@@ -40,11 +40,11 @@ class PeerHandle(ABC):
     pass
 
   @abstractmethod
-  async def send_prompt(self, shard: Shard, prompt: str, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_prompt(self, shard: Shard, prompt: str, request_id: Optional[str] = None) -> Optional[MLXArray]:
     pass
 
   @abstractmethod
-  async def send_tensor(self, shard: Shard, tensor: np.array, request_id: Optional[str] = None) -> Optional[np.array]:
+  async def send_tensor(self, shard: Shard, tensor: MLXArray, request_id: Optional[str] = None) -> Optional[MLXArray]:
     pass
 
   @abstractmethod

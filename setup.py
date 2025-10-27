@@ -4,39 +4,34 @@ import subprocess
 
 from setuptools import find_packages, setup
 
-# Base requirements for all platforms
+# Base requirements for all platforms (using >= for Python 3.14t compatibility)
+# Using GitHub repos for our free-threading compatible forks
 install_requires = [
-  "aiohttp==3.10.11",
-  "aiohttp_cors==0.7.0",
-  "aiofiles==24.1.0",
-  "grpcio==1.70.0",
-  "grpcio-tools==1.70.0",
-  "Jinja2==3.1.4",
-  "numpy==2.0.0",
-  "nuitka==2.5.1",
-  "nvidia-ml-py==12.560.30",
-  "opencv-python==4.10.0.84",
-  "pillow==10.4.0",
-  "prometheus-client==0.20.0",
-  "protobuf==5.28.1",
-  "psutil==6.0.0",
-  "pyamdgpuinfo==2.1.6;platform_system=='Linux'",
-  "pydantic==2.9.2",
-  "requests==2.32.3",
-  "rich==13.7.1",
-  "scapy==2.6.1",
-  "tqdm==4.66.4",
-  "transformers==4.46.3",
-  "uuid==1.30",
-  "uvloop==0.21.0",
-  "tinygrad @ git+https://github.com/tinygrad/tinygrad.git@ec120ce6b9ce8e4ff4b5692566a683ef240e8bc8",
+  "aiohttp>=3.10.0",
+  "aiohttp_cors>=0.7.0",
+  "aiofiles>=24.1.0",
+  "grpcio @ git+https://github.com/SolaceHarmony/grpc-mlx@master",
+  "grpcio-tools>=1.76.0",
+  "Jinja2>=3.1.0",
+  "pillow>=10.4.0",
+  "prometheus-client>=0.20.0",
+  "protobuf>=5.28.0",
+  "psutil>=6.0.0",
+  "pyamdgpuinfo>=2.1.6;platform_system=='Linux'",
+  "pydantic>=2.9.0",
+  "requests>=2.32.0",
+  "rich>=13.7.0",
+  "scapy>=2.6.0",
+  "tqdm>=4.66.0",
+  "uuid>=1.30",
+  "uvloop>=0.21.0",
 ]
 
 extras_require = {
   "formatting": ["yapf==0.40.2",],
   "apple_silicon": [
-    "mlx==0.22.0",
-    "mlx-lm==0.21.1",
+    "mlx @ git+https://github.com/SolaceHarmony/mlx-precise@main",
+    "mlx-lm>=0.21.1",
   ],
   "windows": ["pywin32==308",],
   "nvidia-gpu": ["nvidia-ml-py==12.560.30",],
@@ -80,7 +75,7 @@ _add_gpu_requires()
 
 setup(
   name="exo",
-  version="0.0.1",
+  version="0.0.1.999",
   packages=find_packages(),
   install_requires=install_requires,
   extras_require=extras_require,

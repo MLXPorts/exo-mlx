@@ -1,6 +1,5 @@
 import grpc
 from concurrent import futures
-import numpy as np
 from asyncio import CancelledError
 
 import platform
@@ -9,13 +8,9 @@ from . import node_service_pb2
 from . import node_service_pb2_grpc
 from exo import DEBUG
 from exo.inference.shard import Shard
+from exo.inference.mlx_array import MLXArray, array_from_bytes
 from exo.orchestration import Node
 import json
-
-if platform.system().lower() == "darwin" and platform.machine().lower() == "arm64":
-  import mlx.core as mx
-else:
-  import numpy as mx
 
 
 class GRPCServer(node_service_pb2_grpc.NodeServiceServicer):
@@ -81,7 +76,8 @@ class GRPCServer(node_service_pb2_grpc.NodeServiceServicer):
       end_layer=request.shard.end_layer,
       n_layers=request.shard.n_layers,
     )
-    tensor = np.frombuffer(request.tensor.tensor_data, dtype=np.dtype(request.tensor.dtype)).reshape(request.tensor.shape)
+    # Deserialize to MLXArray
+    tensor = array_from_bytes(request.tensor.tensor_data, shape=tuple(request.tensor.shape), dtype=request.tensor.dtype)
     request_id = request.request_id
 
     inference_state = None if request.inference_state is None else self.deserialize_inference_state(request.inference_state)

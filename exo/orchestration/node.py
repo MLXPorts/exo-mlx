@@ -1,4 +1,3 @@
-import numpy as np
 import json
 import asyncio
 import uuid
@@ -7,6 +6,7 @@ import traceback
 from typing import List, Dict, Optional, Tuple, Union, Set
 from exo.networking import Discovery, PeerHandle, Server
 from exo.inference.inference_engine import InferenceEngine, Shard
+from exo.inference.mlx_array import MLXArray, ensure_mlx_array
 from exo.topology.topology import Topology
 from exo.topology.device_capabilities import device_capabilities, UNKNOWN_DEVICE_CAPABILITIES
 from exo.topology.partitioning_strategy import Partition, PartitioningStrategy, map_partitions_to_shards
@@ -40,9 +40,9 @@ class Node:
     self.topology: Topology = Topology()
     self.device_capabilities = UNKNOWN_DEVICE_CAPABILITIES
     self.buffered_token_output: Dict[str, Tuple[List[int], bool]] = {}
-    self.buffered_logits: Dict[str, List[np.ndarray]] = {}
-    self.buffered_inputs: Dict[str, List[np.ndarray]] = {}
-    self.buffered_partials: Dict[str, List[np.ndarray]] = {}
+    self.buffered_logits: Dict[str, List[MLXArray]] = {}
+    self.buffered_inputs: Dict[str, List[MLXArray]] = {}
+    self.buffered_partials: Dict[str, List[MLXArray]] = {}
     self.checkpoints: Dict[str, Dict[str, int]] = {}
     
     self.max_generate_tokens = max_generate_tokens
@@ -116,7 +116,7 @@ class Node:
   async def process_inference_result(
     self,
     shard,
-    result: np.ndarray,
+    result: MLXArray,
     request_id: Optional[str] = None,
     inference_state: Optional[dict] = None,
   ):
@@ -151,7 +151,7 @@ class Node:
       self.outstanding_requests[request_id] = "waiting"
       asyncio.create_task(self.forward_tensor(shard, forward, request_id, self.get_partition_index(offset = 1), inference_state))
 
-    return  np.array(self.buffered_token_output[request_id][0]) if shard.model_id != 'stable-diffusion-2-1-base' else intermediate_result
+    return  MLXArray(self.buffered_token_output[request_id][0]) if shard.model_id != 'stable-diffusion-2-1-base' else intermediate_result
 
 
   async def process_prompt(
@@ -160,7 +160,7 @@ class Node:
     prompt: str,
     request_id: Optional[str] = None,
     inference_state: Optional[dict] = {},
-  ) -> Optional[np.ndarray]:
+  ) -> Optional[MLXArray]:
     shard = self.get_current_shard(base_shard)
     start_time = time.perf_counter_ns()
     asyncio.create_task(
@@ -198,7 +198,7 @@ class Node:
     )
     if DEBUG >= 2: print(f"[{request_id}] process prompt: {base_shard=} {shard=} {prompt=} {elapsed_time_ns=}")
 
-  async def _process_prompt(self, base_shard: Shard, prompt: str, request_id: Optional[str] = None, inference_state: Optional[dict] = None) -> Optional[np.ndarray]:
+  async def _process_prompt(self, base_shard: Shard, prompt: str, request_id: Optional[str] = None, inference_state: Optional[dict] = None) -> Optional[MLXArray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
@@ -218,9 +218,9 @@ class Node:
   async def enqueue_example(
     self,
     base_shard: Shard,
-    example: np.ndarray,
-    target: np.ndarray, 
-    length: np.ndarray,
+    example: MLXArray,
+    target: MLXArray,
+    length: MLXArray,
     request_id: Optional[str] = None,
     train: bool = False,
   ):
@@ -262,9 +262,9 @@ class Node:
   async def process_example(
     self,
     base_shard: Shard,
-    example: np.ndarray,
-    target: np.ndarray, 
-    length: np.ndarray,
+    example: MLXArray,
+    target: MLXArray,
+    length: MLXArray,
     train: bool = False,
     request_id: Optional[str] = None,
   ):
@@ -307,12 +307,12 @@ class Node:
   async def _process_example(
     self,
     base_shard: Shard,
-    example: np.ndarray,
-    target: np.ndarray, 
-    length: np.ndarray,
+    example: MLXArray,
+    target: MLXArray,
+    length: MLXArray,
     train: bool = False,
     request_id: Optional[str] = None,
-  ) -> Optional[np.ndarray]:
+  ) -> Optional[MLXArray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
@@ -355,10 +355,10 @@ class Node:
   async def process_tensor(
     self,
     base_shard: Shard,
-    tensor: np.ndarray,
+    tensor: MLXArray,
     request_id: Optional[str] = None,
     inference_state: Optional[dict] = None,
-  ) -> Optional[np.ndarray]:
+  ) -> Optional[MLXArray]:
     shard = self.get_current_shard(base_shard)
     start_time = time.perf_counter_ns()
     resp = await self._process_tensor(shard, tensor, request_id, inference_state)
@@ -369,10 +369,10 @@ class Node:
   async def _process_tensor(
     self,
     base_shard: Shard,
-    tensor: np.ndarray,
+    tensor: MLXArray,
     request_id: Optional[str] = None,
     inference_state: Optional[dict] = None,
-  ) -> Optional[np.ndarray]:
+  ) -> Optional[MLXArray]:
     if request_id is None:
       request_id = str(uuid.uuid4())
     shard = self.get_current_shard(base_shard)
@@ -390,9 +390,9 @@ class Node:
   async def forward_example(
     self,
     base_shard: Shard,
-    step: np.ndarray,
-    target: np.ndarray,
-    length: np.ndarray,
+    step: MLXArray,
+    target: MLXArray,
+    length: MLXArray,
     train: bool,
     request_id: str,
     target_index: int,
@@ -432,7 +432,7 @@ class Node:
   async def forward_tensor(
     self,
     base_shard: Shard,
-    tensor: np.ndarray,
+    tensor: MLXArray,
     request_id: str,
     target_index: int,
     inference_state: Optional[dict] = None,

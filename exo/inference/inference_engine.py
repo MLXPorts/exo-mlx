@@ -1,30 +1,30 @@
-import numpy as np
 import os
 from exo.helpers import DEBUG  # Make sure to import DEBUG
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from abc import ABC, abstractmethod
 from .shard import Shard
 from exo.download.shard_download import ShardDownloader
+from .mlx_array import MLXArray, ensure_mlx_array
 
 
 class InferenceEngine(ABC):
   session = {}
 
   @abstractmethod
-  async def encode(self, shard: Shard, prompt: str) -> np.ndarray:
+  async def encode(self, shard: Shard, prompt: str) -> MLXArray:
     pass
 
   @abstractmethod
-  async def sample(self, x: np.ndarray) -> np.ndarray:
+  async def sample(self, x: MLXArray) -> MLXArray:
     pass
 
   @abstractmethod
-  async def decode(self, shard: Shard, tokens: np.ndarray) -> str:
+  async def decode(self, shard: Shard, tokens: Union[MLXArray, list]) -> str:
     pass
 
   @abstractmethod
-  async def infer_tensor(self, request_id: str, shard: Shard, input_data: np.ndarray, inference_state: Optional[dict] = None) -> tuple[np.ndarray, Optional[dict]]:
+  async def infer_tensor(self, request_id: str, shard: Shard, input_data: MLXArray, inference_state: Optional[dict] = None) -> tuple[MLXArray, Optional[dict]]:
     pass
 
   @abstractmethod
@@ -40,7 +40,7 @@ class InferenceEngine(ABC):
   async def clear_session(self):
     self.session.empty()
 
-  async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, inference_state: Optional[dict] = None) -> tuple[np.ndarray, Optional[dict]]:
+  async def infer_prompt(self, request_id: str, shard: Shard, prompt: str, inference_state: Optional[dict] = None) -> tuple[MLXArray, Optional[dict]]:
     tokens = await self.encode(shard, prompt)
     if shard.model_id != 'stable-diffusion-2-1-base':
       x = tokens.reshape(1, -1)

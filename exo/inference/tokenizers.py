@@ -2,8 +2,8 @@ import traceback
 from os import PathLike
 from aiofiles import os as aios
 from typing import Union
-from transformers import AutoTokenizer, AutoProcessor
-import numpy as np
+import mlx.core as mx
+from mlx_lm import load
 from exo.helpers import DEBUG
 from exo.download.new_shard_download import ensure_downloads_dir
 
@@ -17,7 +17,7 @@ class DummyTokenizer:
     return "dummy_tokenized_prompt"
 
   def encode(self, text):
-    return np.array([1])
+    return mx.array([1])
 
   def decode(self, tokens):
     return "dummy" * len(tokens)
@@ -40,24 +40,12 @@ async def resolve_tokenizer(repo_id: Union[str, PathLike]):
 
 async def _resolve_tokenizer(repo_id_or_local_path: Union[str, PathLike]):
   try:
-    if DEBUG >= 4: print(f"Trying AutoProcessor for {repo_id_or_local_path}")
-    processor = AutoProcessor.from_pretrained(repo_id_or_local_path, use_fast=True if "Mistral-Large" in f"{repo_id_or_local_path}" else False, trust_remote_code=True)
-    if not hasattr(processor, 'eos_token_id'):
-      processor.eos_token_id = getattr(processor, 'tokenizer', getattr(processor, '_tokenizer', processor)).eos_token_id
-    if not hasattr(processor, 'encode'):
-      processor.encode = getattr(processor, 'tokenizer', getattr(processor, '_tokenizer', processor)).encode
-    if not hasattr(processor, 'decode'):
-      processor.decode = getattr(processor, 'tokenizer', getattr(processor, '_tokenizer', processor)).decode
-    return processor
+    if DEBUG >= 4: print(f"Loading MLX tokenizer for {repo_id_or_local_path}")
+    # MLX-LM's load function returns (model, tokenizer)
+    # We only need the tokenizer for this function
+    _, tokenizer = load(str(repo_id_or_local_path))
+    return tokenizer
   except Exception as e:
-    if DEBUG >= 4: print(f"Failed to load processor for {repo_id_or_local_path}. Error: {e}")
+    if DEBUG >= 4: print(f"Failed to load MLX tokenizer for {repo_id_or_local_path}. Error: {e}")
     if DEBUG >= 4: print(traceback.format_exc())
-
-  try:
-    if DEBUG >= 4: print(f"Trying AutoTokenizer for {repo_id_or_local_path}")
-    return AutoTokenizer.from_pretrained(repo_id_or_local_path, trust_remote_code=True)
-  except Exception as e:
-    if DEBUG >= 4: print(f"Failed to load tokenizer for {repo_id_or_local_path}. Falling back to tinygrad tokenizer. Error: {e}")
-    if DEBUG >= 4: print(traceback.format_exc())
-
-  raise ValueError(f"[TODO] Unsupported model: {repo_id_or_local_path}")
+    raise ValueError(f"Unsupported model: {repo_id_or_local_path}")
