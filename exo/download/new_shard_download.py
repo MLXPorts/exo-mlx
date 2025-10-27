@@ -177,18 +177,27 @@ def calculate_repo_progress(shard: Shard, repo_id: str, revision: str, file_prog
   status = "complete" if all(p.status == "complete" for p in file_progress.values()) else "in_progress" if any(p.status == "in_progress" for p in file_progress.values()) else "not_started"
   return RepoProgressEvent(shard, repo_id, revision, len([p for p in file_progress.values() if p.downloaded == p.total]), len(file_progress), all_downloaded_bytes, all_downloaded_bytes_this_session, all_total_bytes, all_speed, all_eta, file_progress, status)
 
-async def get_weight_map(repo_id: str, revision: str = "main") -> Dict[str, str]:
+async def get_weight_map(repo_id: str, revision: str = "main") -> Optional[Dict[str, str]]:
   target_dir = (await ensure_exo_tmp())/repo_id.replace("/", "--")
-  index_file = await download_file_with_retry(repo_id, revision, "model.safetensors.index.json", target_dir)
-  async with aiofiles.open(index_file, 'r') as f: index_data = json.loads(await f.read())
-  return index_data.get("weight_map")
+  try:
+    index_file = await download_file_with_retry(repo_id, revision, "model.safetensors.index.json", target_dir)
+    async with aiofiles.open(index_file, 'r') as f: index_data = json.loads(await f.read())
+    return index_data.get("weight_map")
+  except FileNotFoundError:
+    # Models like Stable Diffusion don't have model.safetensors.index.json
+    if DEBUG >= 2: print(f"No weight map found for {repo_id} (this is normal for non-transformer models like Stable Diffusion)")
+    return None
 
 async def resolve_allow_patterns(shard: Shard, inference_engine_classname: str) -> List[str]:
   try:
     weight_map = await get_weight_map(get_repo(shard.model_id, inference_engine_classname))
+    if weight_map is None:
+      # No weight map means non-transformer model (e.g., Stable Diffusion)
+      if DEBUG >= 2: print(f"No weight map for {shard.model_id=}, downloading all files")
+      return ["*"]
     return get_allow_patterns(weight_map, shard)
-  except:
-    if DEBUG >= 1: print(f"Error getting weight map for {shard.model_id=} and inference engine {inference_engine_classname}")
+  except Exception as e:
+    if DEBUG >= 1: print(f"Error resolving allow patterns for {shard.model_id=}: {e}")
     if DEBUG >= 1: traceback.print_exc()
     return ["*"]
 
