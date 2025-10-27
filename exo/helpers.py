@@ -230,6 +230,24 @@ def pretty_print_bytes_per_second(bytes_per_second: int) -> str:
     return f"{bytes_per_second / (1024 ** 4):.2f} TB/s"
 
 
+def _ip_address_priority(ip: str) -> int:
+    """Return priority for IP addresses. Lower number = higher priority.
+
+    Priority order:
+    1. Link-local (169.254.x.x) - best for direct peer connections
+    2. Private networks (10.x, 172.16-31.x, 192.168.x)
+    3. Public IPs
+    4. Localhost (127.x)
+    """
+    if ip.startswith("169.254."):
+        return 0  # Highest priority - link-local for direct connections
+    elif ip.startswith("10.") or ip.startswith("192.168.") or any(ip.startswith(f"172.{i}.") for i in range(16, 32)):
+        return 1  # Private networks
+    elif ip.startswith("127."):
+        return 3  # Lowest priority - localhost
+    else:
+        return 2  # Public IPs
+
 def get_all_ip_addresses_and_interfaces():
     ip_addresses = []
     for interface in get_if_list():
@@ -244,7 +262,15 @@ def get_all_ip_addresses_and_interfaces():
     if not ip_addresses:
       if DEBUG >= 1: print("Failed to get any IP addresses. Defaulting to localhost.")
       return [("localhost", "lo")]
-    return list(set(ip_addresses))
+
+    # Remove duplicates and sort by priority (link-local first)
+    unique_addresses = list(set(ip_addresses))
+    unique_addresses.sort(key=lambda x: _ip_address_priority(x[0]))
+
+    if DEBUG >= 2:
+        print(f"IP addresses prioritized (link-local first): {unique_addresses}")
+
+    return unique_addresses
 
 
 
