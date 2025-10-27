@@ -41,11 +41,11 @@ exo: Run your own AI cluster at home with everyday devices. Maintained by [exo l
 > **This is a specialized fork of exo with Python 3.14 free-threading support and MLX acceleration.**
 >
 > **Key Differences from Upstream:**
-> - **MLX-Native:** All inference runs on [mlx-precise](https://github.com/SolaceHarmony/mlx-precise) with true double-precision math
+> - **MLX-Native:** All inference runs on [mlx-precise](https://github.com/MLXPorts/mlx-precise) with true double-precision math
 > - **NumPy-Free:** Complete removal of NumPy dependency for zero-copy tensor operations
-> - **GIL-Free:** Built for Python 3.14+ free-threading with [grpc-mlx](https://github.com/SolaceHarmony/grpc-mlx) (Cython free-threading support)
+> - **GIL-Free:** Built for Python 3.14+ free-threading with [grpc-mlx](https://github.com/MLXPorts/grpc-mlx) (Cython free-threading support)
 > - **Multi-Backend:** Supports CPU, GPU (Metal on Apple Silicon), and CUDA
-> - **Interdependent Fork Ecosystem:** Uses [opencv-mlx](https://github.com/SolaceHarmony/opencv-mlx) for MLX-native computer vision
+> - **Interdependent Fork Ecosystem:** Uses [opencv-mlx](https://github.com/MLXPorts/opencv-mlx) for MLX-native computer vision
 
 **Requirements:**
 - **Python 3.14 or later** (required for free-threading)
@@ -57,7 +57,7 @@ exo: Run your own AI cluster at home with everyday devices. Maintained by [exo l
 python --version  # Should show Python 3.14.0 or later
 
 # Install from source
-git clone https://github.com/SolaceHarmony/exo-mlx
+git clone https://github.com/MLXPorts/exo-mlx
 cd exo-mlx
 pip install -e .
 
@@ -67,9 +67,9 @@ PYTHON_GIL=0 exo
 
 **Fork Ecosystem:**
 All dependencies use our free-threading compatible forks:
-- [mlx-precise](https://github.com/SolaceHarmony/mlx-precise) - True double-precision MLX
-- [grpc-mlx](https://github.com/SolaceHarmony/grpc-mlx) - Free-threading gRPC
-- [opencv-mlx](https://github.com/SolaceHarmony/opencv-mlx) - MLX-native computer vision
+- [mlx-precise](https://github.com/MLXPorts/mlx-precise) - True double-precision MLX
+- [grpc-mlx](https://github.com/MLXPorts/grpc-mlx) - Free-threading gRPC
+- [opencv-mlx](https://github.com/MLXPorts/opencv-mlx) - MLX-native computer vision
 
 ---
 
