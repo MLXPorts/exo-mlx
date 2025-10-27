@@ -19,6 +19,7 @@ from tqdm import tqdm
 from exo.train.dataset import load_dataset, iterate_batches
 from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.direct.direct_discovery import DirectDiscovery
+from exo.networking.tcp.tcp_discovery import TCPDiscovery
 from exo.orchestration.node import Node
 from exo.networking.grpc.grpc_server import GRPCServer
 from exo.networking.udp.udp_discovery import UDPDiscovery
@@ -73,13 +74,13 @@ parser.add_argument("--resume-checkpoint", type=str, default=None, help="Path to
 parser.add_argument("--save-checkpoint-dir", type=str, default="checkpoints", help="Path to a folder where checkpoints are stored")
 parser.add_argument("--node-id", type=str, default=None, help="Node ID")
 parser.add_argument("--node-host", type=str, default="0.0.0.0", help="Node host")
-parser.add_argument("--node-port", type=int, default=None, help="Node port")
+parser.add_argument("--node-port", type=int, default=50051, help="Node port (default: 50051)")
 parser.add_argument("--models-seed-dir", type=str, default=None, help="Model seed directory")
 parser.add_argument("--listen-port", type=int, default=5678, help="Listening port for discovery")
 parser.add_argument("--download-quick-check", action="store_true", help="Quick check local path for model shards download")
 parser.add_argument("--max-parallel-downloads", type=int, default=8, help="Max parallel downloads for model shards download")
 parser.add_argument("--broadcast-port", type=int, default=5678, help="Broadcast port for discovery")
-parser.add_argument("--discovery-module", type=str, choices=["udp", "tailscale", "manual", "direct"], default="udp", help="Discovery module to use")
+parser.add_argument("--discovery-module", type=str, choices=["udp", "tcp", "tailscale", "manual", "direct"], default="udp", help="Discovery module to use")
 parser.add_argument("--discovery-timeout", type=int, default=30, help="Discovery timeout in seconds")
 parser.add_argument("--discovery-config-path", type=str, default=None, help="Path to discovery config json file")
 parser.add_argument("--peer-host", type=str, default=None, help="Direct peer host IP address (for direct discovery)")
@@ -125,11 +126,9 @@ print(f"Inference engine name after selection: {inference_engine_name}")
 inference_engine = get_inference_engine(inference_engine_name, shard_downloader)
 print(f"Using inference engine: {inference_engine.__class__.__name__} with shard downloader: {shard_downloader.__class__.__name__}")
 
-if args.node_port is None:
-  args.node_port = find_available_port(args.node_host)
-  if DEBUG >= 1: print(f"Using available port: {args.node_port}")
-
 args.node_id = args.node_id or get_or_create_node_id()
+print(f"Node ID: {args.node_id}")
+print(f"Node gRPC port: {args.node_port}")
 chatgpt_api_endpoints = [f"http://{ip}:{args.chatgpt_api_port}/v1/chat/completions" for ip, _ in get_all_ip_addresses_and_interfaces()]
 web_chat_urls = [f"http://{ip}:{args.chatgpt_api_port}" for ip, _ in get_all_ip_addresses_and_interfaces()]
 if DEBUG >= 0:
@@ -157,6 +156,13 @@ if args.discovery_module == "udp":
     discovery_timeout=args.discovery_timeout,
     allowed_node_ids=allowed_node_ids,
     allowed_interface_types=allowed_interface_types
+  )
+elif args.discovery_module == "tcp":
+  discovery = TCPDiscovery(
+    args.node_id,
+    args.node_port,
+    args.listen_port,
+    lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities),
   )
 elif args.discovery_module == "tailscale":
   discovery = TailscaleDiscovery(
