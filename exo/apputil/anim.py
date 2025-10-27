@@ -4,12 +4,12 @@ import sys
 
 # Optional dependencies for video creation (not needed for core MLX inference)
 try:
-    import numpy as np
+    import mlx.core as mx
     import cv2
     VIDEO_CREATION_AVAILABLE = True
 except ImportError:
     VIDEO_CREATION_AVAILABLE = False
-    np = None
+    mx = None
     cv2 = None
 
 def draw_rounded_rectangle(draw, coords, radius, fill):
@@ -82,7 +82,7 @@ def create_animation_mp4(
   prompt_coords=(332, 1702, 2662, 1745)
 ):
   if not VIDEO_CREATION_AVAILABLE:
-    print("Video creation not available (opencv-python not installed)")
+    print("Video creation not available (opencv-mlx not installed)")
     return
   frames = []
   try:
@@ -156,7 +156,7 @@ def create_animation_mp4(
 
   # Convert frames to video using H.264 codec
   if frames:
-    first_frame = np.array(frames[0])
+    first_frame = mx.array(frames[0])
     height, width = first_frame.shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'avc1')
     out = cv2.VideoWriter(
@@ -172,7 +172,7 @@ def create_animation_mp4(
       return
 
     for frame in frames:
-      frame_array = cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2BGR)
+      frame_array = cv2.cvtColor(mx.array(frame), cv2.COLOR_RGB2BGR)
       out.write(frame_array)
     
     out.release()

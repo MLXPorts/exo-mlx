@@ -38,19 +38,18 @@ exo: Run your own AI cluster at home with everyday devices. Maintained by [exo l
 
 ## exo-mlx: MLX-Native, NumPy-Free, GIL-Free Fork
 
-> **This is a specialized fork of exo focused on Apple Silicon with Python 3.14 free-threading support.**
+> **This is a specialized fork of exo with Python 3.14 free-threading support and MLX acceleration.**
 >
 > **Key Differences from Upstream:**
 > - **MLX-Native:** All inference runs on [mlx-precise](https://github.com/SolaceHarmony/mlx-precise) with true double-precision math
 > - **NumPy-Free:** Complete removal of NumPy dependency for zero-copy tensor operations
 > - **GIL-Free:** Built for Python 3.14+ free-threading with [grpc-mlx](https://github.com/SolaceHarmony/grpc-mlx) (Cython free-threading support)
-> - **Apple Silicon Only:** Optimized exclusively for M1/M2/M3/M4 with Metal acceleration
+> - **Multi-Backend:** Supports CPU, GPU (Metal on Apple Silicon), and CUDA
 > - **Interdependent Fork Ecosystem:** Uses [opencv-mlx](https://github.com/SolaceHarmony/opencv-mlx) for MLX-native computer vision
 
 **Requirements:**
 - **Python 3.14 or later** (required for free-threading)
-- **Apple Silicon Mac** (M1/M2/M3/M4)
-- **macOS 11.0+**
+- **Hardware:** CPU, Apple Silicon (M1/M2/M3/M4), or NVIDIA GPU (CUDA)
 
 **Installation:**
 ```bash

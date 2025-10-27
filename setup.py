@@ -13,6 +13,9 @@ install_requires = [
   "grpcio @ git+https://github.com/SolaceHarmony/grpc-mlx@master",
   "grpcio-tools>=1.76.0",
   "Jinja2>=3.1.0",
+  "mlx @ git+https://github.com/SolaceHarmony/mlx-precise@main",
+  "mlx-lm>=0.21.1",
+  "opencv @ git+https://github.com/SolaceHarmony/opencv-mlx@4.x",
   "pillow>=10.4.0",
   "prometheus-client>=0.20.0",
   "protobuf>=5.28.0",
@@ -29,18 +32,10 @@ install_requires = [
 
 extras_require = {
   "formatting": ["yapf==0.40.2",],
-  "apple_silicon": [
-    "mlx @ git+https://github.com/SolaceHarmony/mlx-precise@main",
-    "mlx-lm>=0.21.1",
-  ],
   "windows": ["pywin32==308",],
   "nvidia-gpu": ["nvidia-ml-py==12.560.30",],
   "amd-gpu": ["pyrsmi==0.2.0"],
 }
-
-# Check if running on macOS with Apple Silicon
-if sys.platform.startswith("darwin") and platform.machine() == "arm64":
-  install_requires.extend(extras_require["apple_silicon"])
 
 # Check if running Windows
 if sys.platform.startswith("win32"):
