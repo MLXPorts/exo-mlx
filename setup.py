@@ -71,7 +71,7 @@ _add_gpu_requires()
 
 setup(
   name="exo",
-  version="0.0.4",
+  version="0.0.5",
   packages=find_packages(),
   install_requires=install_requires,
   extras_require=extras_require,
