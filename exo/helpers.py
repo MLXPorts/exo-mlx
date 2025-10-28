@@ -406,28 +406,79 @@ def is_frozen():
     or '__nuitka__' in globals() or getattr(sys, '__compiled__', False)
 
 async def get_mac_system_info() -> Tuple[str, str, int]:
-    """Get Mac system information using system_profiler."""
+    """Get Mac system information using system_profiler with robust parsing.
+
+    Order of attempts:
+    1) JSON output (stable field names, locale-independent)
+    2) Text output (fallback for older macOS or constrained envs)
+    """
+    loop = asyncio.get_running_loop()
+
+    # Try JSON first (locale-independent)
     try:
-        output = await asyncio.get_running_loop().run_in_executor(
+        raw_json = await loop.run_in_executor(
             subprocess_pool,
-            lambda: subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode("utf-8")
+            lambda: subprocess.check_output(["system_profiler", "SPHardwareDataType", "-json"])  # bytes
         )
-        
-        model_line = next((line for line in output.split("\n") if "Model Name" in line), None)
-        model_id = model_line.split(": ")[1] if model_line else "Unknown Model"
-        
-        chip_line = next((line for line in output.split("\n") if "Chip" in line), None)
-        chip_id = chip_line.split(": ")[1] if chip_line else "Unknown Chip"
-        
-        memory_line = next((line for line in output.split("\n") if "Memory" in line), None)
-        memory_str = memory_line.split(": ")[1] if memory_line else "Unknown Memory"
-        memory_units = memory_str.split()
-        memory_value = int(memory_units[0])
-        memory = memory_value * 1024 if memory_units[1] == "GB" else memory_value
-        
+        data = json.loads(raw_json.decode("utf-8", errors="ignore"))
+        hw = (data.get("SPHardwareDataType") or [{}])[0]
+
+        # Field names seen on recent macOS: machine_name, chip_type, physical_memory
+        model = hw.get("machine_name") or hw.get("model_name") or hw.get("machine_model") or "Unknown Model"
+        chip = hw.get("chip_type") or hw.get("chip") or hw.get("cpu_type") or "Unknown Chip"
+        mem_str = hw.get("physical_memory") or hw.get("memory") or "0 MB"
+
+        # Normalize memory to MB (accept e.g. "128 GB" or "8192 MB")
+        tokens = str(mem_str).replace("GiB", "GB").replace("MiB", "MB").split()
+        mem_mb = 0
+        if tokens:
+            try:
+                val = float(tokens[0])
+                unit = tokens[1].upper() if len(tokens) > 1 else "MB"
+                mem_mb = int(val * 1024) if unit.startswith("GB") else int(val)
+            except Exception:
+                mem_mb = 0
+
+        if model != "Unknown Model" or chip != "Unknown Chip" or mem_mb > 0:
+            return model, chip, mem_mb
+    except Exception as e:
+        if DEBUG >= 2: print(f"JSON hardware parse failed: {e}")
+
+    # Fallback: parse plain-text output
+    try:
+        output = await loop.run_in_executor(
+            subprocess_pool,
+            lambda: subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode("utf-8", errors="ignore")
+        )
+
+        def extract_value(lines: List[str], key_substrs: List[str]) -> Optional[str]:
+            for line in lines:
+                for key in key_substrs:
+                    if key in line:
+                        parts = line.split(":", 1)
+                        if len(parts) == 2:
+                            return parts[1].strip()
+            return None
+
+        lines = output.split("\n")
+        model_id = extract_value(lines, ["Model Name"]) or "Unknown Model"
+        chip_id = extract_value(lines, ["Chip", "Chipset Model"]) or "Unknown Chip"
+        memory_str = extract_value(lines, ["Memory", "physical_memory"]) or "0 MB"
+
+        # Normalize memory
+        tokens = memory_str.replace("GiB", "GB").replace("MiB", "MB").split()
+        memory = 0
+        if tokens:
+            try:
+                val = float(tokens[0])
+                unit = tokens[1].upper() if len(tokens) > 1 else "MB"
+                memory = int(val * 1024) if unit.startswith("GB") else int(val)
+            except Exception:
+                memory = 0
+
         return model_id, chip_id, memory
     except Exception as e:
-        if DEBUG >= 2: print(f"Error getting Mac system info: {e}")
+        if DEBUG >= 2: print(f"Text hardware parse failed: {e}")
         return "Unknown Model", "Unknown Chip", 0
 
 def get_exo_home() -> Path:
