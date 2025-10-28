@@ -233,7 +233,7 @@ def pretty_print_bytes_per_second(bytes_per_second: int) -> str:
 def _ip_address_priority(ip: str) -> int:
     """Return priority for IP addresses. Lower number = higher priority.
 
-    Priority order:
+    Priority order (peer discovery):
     1. Link-local (169.254.x.x) - best for direct peer connections
     2. Private networks (10.x, 172.16-31.x, 192.168.x)
     3. Public IPs
@@ -247,6 +247,24 @@ def _ip_address_priority(ip: str) -> int:
         return 3  # Lowest priority - localhost
     else:
         return 2  # Public IPs
+
+def _ip_address_priority_internet(ip: str) -> int:
+    """Return priority for IP addresses for internet-facing endpoints.
+
+    Priority order (internet/ui):
+    1. Private networks (10.x, 172.16-31.x, 192.168.x)
+    2. Public IPs
+    3. Link-local (169.254.x.x)
+    4. Localhost (127.x)
+    """
+    if ip.startswith("127."):
+        return 3
+    elif ip.startswith("169.254."):
+        return 2
+    elif ip.startswith("10.") or ip.startswith("192.168.") or any(ip.startswith(f"172.{i}.") for i in range(16, 32)):
+        return 0
+    else:
+        return 1
 
 def get_all_ip_addresses_and_interfaces():
     ip_addresses = []
@@ -263,12 +281,42 @@ def get_all_ip_addresses_and_interfaces():
       if DEBUG >= 1: print("Failed to get any IP addresses. Defaulting to localhost.")
       return [("localhost", "lo")]
 
-    # Remove duplicates and sort by priority (link-local first)
+    # Remove duplicates and sort by priority (peer-discovery: link-local first)
     unique_addresses = list(set(ip_addresses))
     unique_addresses.sort(key=lambda x: _ip_address_priority(x[0]))
 
     if DEBUG >= 2:
         print(f"IP addresses prioritized (link-local first): {unique_addresses}")
+
+    return unique_addresses
+
+
+def get_internet_friendly_ip_addresses_and_interfaces():
+    """Return local IPv4 addresses ordered for external/web connectivity.
+
+    - Prefer RFC1918 private addresses, then public, then link-local, then localhost.
+    This avoids advertising 169.254.* first for web UI/API links when no
+    link-local connectivity exists.
+    """
+    ip_addresses = []
+    for interface in get_if_list():
+      try:
+        ip = get_if_addr(interface)
+        if ip.startswith("0.0."): continue
+        simplified_interface = re.sub(r'^\\Device\\NPF_', '', interface)
+        ip_addresses.append((ip, simplified_interface))
+      except:
+        if DEBUG >= 1: print(f"Failed to get IP address for interface {interface}")
+        if DEBUG >= 1: traceback.print_exc()
+    if not ip_addresses:
+      if DEBUG >= 1: print("Failed to get any IP addresses. Defaulting to localhost.")
+      return [("localhost", "lo")]
+
+    unique_addresses = list(set(ip_addresses))
+    unique_addresses.sort(key=lambda x: _ip_address_priority_internet(x[0]))
+
+    if DEBUG >= 2:
+        print(f"IP addresses prioritized (internet/ui first): {unique_addresses}")
 
     return unique_addresses
 
