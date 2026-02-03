@@ -9,10 +9,7 @@ import time
 import traceback
 import uuid
 
-# IMPORTANT: Set gRPC verbosity BEFORE importing any grpc modules
-os.environ["GRPC_VERBOSITY"] = "error"
-os.environ["GRPC_TRACE"] = ""
-os.environ["GRPC_VERBOSITY_LEVEL"] = "ERROR"
+# No longer using gRPC - using socket-based communication
 
 import numpy as np
 from tqdm import tqdm
@@ -21,10 +18,10 @@ from exo.networking.manual.manual_discovery import ManualDiscovery
 from exo.networking.direct.direct_discovery import DirectDiscovery
 from exo.networking.tcp.tcp_discovery import TCPDiscovery
 from exo.orchestration.node import Node
-from exo.networking.grpc.grpc_server import GRPCServer
+from exo.networking.socket.socket_server import SocketServer
 from exo.networking.udp.udp_discovery import UDPDiscovery
 from exo.networking.tailscale.tailscale_discovery import TailscaleDiscovery
-from exo.networking.grpc.grpc_peer_handle import GRPCPeerHandle
+from exo.networking.socket.socket_peer_handle import SocketPeerHandle
 from exo.topology.ring_memory_weighted_partitioning_strategy import RingMemoryWeightedPartitioningStrategy
 from exo.api import ChatGPTAPI
 from exo.download.shard_download import ShardDownloader, NoopShardDownloader
@@ -62,7 +59,7 @@ def configure_uvloop():
     return loop
 
 # parse args
-parser = argparse.ArgumentParser(description="Initialize GRPC Discovery")
+parser = argparse.ArgumentParser(description="Initialize Exo Node")
 parser.add_argument("command", nargs="?", choices=["run", "eval", "train"], help="Command to run")
 parser.add_argument("model_name", nargs="?", help="Model name to run")
 parser.add_argument("--default-model", type=str, default=None, help="Default model")
@@ -153,7 +150,7 @@ if args.discovery_module == "udp":
     args.node_port,
     args.listen_port,
     args.broadcast_port,
-    lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities),
+    lambda peer_id, address, description, device_capabilities: SocketPeerHandle(peer_id, address, description, device_capabilities),
     discovery_timeout=args.discovery_timeout,
     allowed_node_ids=allowed_node_ids,
     allowed_interface_types=allowed_interface_types
@@ -163,13 +160,13 @@ elif args.discovery_module == "tcp":
     args.node_id,
     args.node_port,
     args.listen_port,
-    lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities),
+    lambda peer_id, address, description, device_capabilities: SocketPeerHandle(peer_id, address, description, device_capabilities),
   )
 elif args.discovery_module == "tailscale":
   discovery = TailscaleDiscovery(
     args.node_id,
     args.node_port,
-    lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities),
+    lambda peer_id, address, description, device_capabilities: SocketPeerHandle(peer_id, address, description, device_capabilities),
     discovery_timeout=args.discovery_timeout,
     tailscale_api_key=args.tailscale_api_key,
     tailnet=args.tailnet_name,
@@ -178,7 +175,7 @@ elif args.discovery_module == "tailscale":
 elif args.discovery_module == "manual":
   if not args.discovery_config_path:
     raise ValueError(f"--discovery-config-path is required when using manual discovery. Please provide a path to a config json file.")
-  discovery = ManualDiscovery(args.discovery_config_path, args.node_id, create_peer_handle=lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities))
+  discovery = ManualDiscovery(args.discovery_config_path, args.node_id, create_peer_handle=lambda peer_id, address, description, device_capabilities: SocketPeerHandle(peer_id, address, description, device_capabilities))
 elif args.discovery_module == "direct":
   if not args.peer_host or not args.peer_port:
     raise ValueError(f"--peer-host and --peer-port are required when using direct discovery. Example: --peer-host 169.254.100.10 --peer-port 50051")
@@ -186,7 +183,7 @@ elif args.discovery_module == "direct":
     args.peer_host,
     args.peer_port,
     args.peer_id,
-    create_peer_handle=lambda peer_id, address, description, device_capabilities: GRPCPeerHandle(peer_id, address, description, device_capabilities)
+    create_peer_handle=lambda peer_id, address, description, device_capabilities: SocketPeerHandle(peer_id, address, description, device_capabilities)
   )
 topology_viz = TopologyViz(chatgpt_api_endpoints=chatgpt_api_endpoints, web_chat_urls=web_chat_urls) if not args.disable_tui else None
 node = Node(
@@ -200,7 +197,7 @@ node = Node(
   topology_viz=topology_viz,
   default_sample_temperature=args.default_temp
 )
-server = GRPCServer(node, args.node_host, args.node_port)
+server = SocketServer(node, args.node_host, args.node_port)
 node.server = server
 api = ChatGPTAPI(
   node,

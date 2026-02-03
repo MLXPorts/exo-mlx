@@ -10,15 +10,12 @@ install_requires = [
   "aiohttp>=3.10.0",
   "aiohttp_cors>=0.7.0",
   "aiofiles>=24.1.0",
-  "grpcio @ git+https://github.com/MLXPorts/grpc-mlx@master",
-  "grpcio-tools>=1.76.0",
   "Jinja2>=3.1.0",
   "mlx @ git+https://github.com/MLXPorts/mlx-precise@main",
   "mlx-lm>=0.21.1",
   "opencv @ git+https://github.com/MLXPorts/opencv-mlx@4.x#subdirectory=modules/python/package",
   "pillow>=10.4.0",
   "prometheus-client>=0.20.0",
-  "protobuf>=5.28.0",
   "psutil>=6.0.0",
   "pyamdgpuinfo>=2.1.6;platform_system=='Linux'",
   "pydantic>=2.9.0",
@@ -28,7 +25,6 @@ install_requires = [
   "tqdm>=4.66.0",
   "uuid>=1.30",
   "uvloop>=0.21.0",
-  "zeroconf>=0.132.0",
 ]
 
 extras_require = {

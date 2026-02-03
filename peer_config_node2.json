@@ -1,0 +1,18 @@
+{
+  "comment": "Node 2 config - points to Node 1",
+  "peers": {
+    "test-node-1": {
+      "address": "127.0.0.1:50051",
+      "device_capabilities": {
+        "model": "Test Node 1",
+        "chip": "Apple M3",
+        "memory": 32768,
+        "flops": {
+          "fp32": 10.0,
+          "fp16": 20.0,
+          "int8": 40.0
+        }
+      }
+    }
+  }
+}
