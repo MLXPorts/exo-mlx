@@ -1,0 +1,34 @@
+{
+  "comment": "Mac #2 (192.168.2.1) - manual discovery config",
+  "comment2": "Includes current node (mac2) and peer (mac1 via reverse tunnel)",
+  "peers": {
+    "mac2": {
+      "address": "127.0.0.1",
+      "port": 50051,
+      "device_capabilities": {
+        "model": "Mac Studio",
+        "chip": "Apple M3 Ultra",
+        "memory": 262144,
+        "flops": {
+          "fp32": 54.26,
+          "fp16": 108.52,
+          "int8": 217.04
+        }
+      }
+    },
+    "mac1": {
+      "address": "127.0.0.1",
+      "port": 50060,
+      "device_capabilities": {
+        "model": "Mac #1",
+        "chip": "Apple Silicon",
+        "memory": 32768,
+        "flops": {
+          "fp32": 10.0,
+          "fp16": 20.0,
+          "int8": 40.0
+        }
+      }
+    }
+  }
+}

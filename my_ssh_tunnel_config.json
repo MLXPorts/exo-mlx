@@ -1,0 +1,18 @@
+{
+  "comment": "Config for SSH tunnel: ssh -L 49703:10.0.0.151:49703 -L 52415:10.0.0.151:52415 -N remoteuser@10.0.0.151",
+  "peers": {
+    "remote-node": {
+      "address": "127.0.0.1:49703",
+      "device_capabilities": {
+        "model": "Remote Machine",
+        "chip": "Apple M3",
+        "memory": 65536,
+        "flops": {
+          "fp32": 14.0,
+          "fp16": 28.0,
+          "int8": 56.0
+        }
+      }
+    }
+  }
+}

@@ -111,42 +111,47 @@ class SocketPeerHandle(PeerHandle):
             await self.connect()
 
     async def _send_message(self, msg_type: MessageType, payload: bytes) -> None:
-        """Send a message to peer."""
-        async with self._lock:
-            await self._ensure_connected()
-            message = pack_message(msg_type, payload)
-            self.writer.write(message)
-            await self.writer.drain()
+        """Send a message to peer. Must be called with lock held."""
+        message = pack_message(msg_type, payload)
+        self.writer.write(message)
+        await self.writer.drain()
 
     async def _recv_message(self) -> tuple[MessageType, bytes]:
-        """Receive a message from peer."""
-        async with self._lock:
-            await self._ensure_connected()
+        """Receive a message from peer. Must be called with lock held."""
+        # Read header
+        header = await asyncio.wait_for(
+            self.reader.readexactly(HEADER_SIZE),
+            timeout=self.timeout
+        )
+        msg_type, payload_len = unpack_header(header)
 
-            # Read header
-            header = await asyncio.wait_for(
-                self.reader.readexactly(HEADER_SIZE),
-                timeout=self.timeout
-            )
-            msg_type, payload_len = unpack_header(header)
+        # Read payload
+        payload = await asyncio.wait_for(
+            self.reader.readexactly(payload_len),
+            timeout=self.timeout
+        )
 
-            # Read payload
-            payload = await asyncio.wait_for(
-                self.reader.readexactly(payload_len),
-                timeout=self.timeout
-            )
-
-            return msg_type, payload
+        return msg_type, payload
 
     async def _send_recv(self, send_type: MessageType, send_payload: bytes, expected_type: MessageType) -> bytes:
-        """Send a message and wait for response."""
-        await self._send_message(send_type, send_payload)
-        recv_type, recv_payload = await self._recv_message()
+        """Send a message and wait for response. Maintains persistent connection."""
+        async with self._lock:
+            try:
+                await self._ensure_connected()
 
-        if recv_type != expected_type:
-            raise ValueError(f"Expected message type {expected_type}, got {recv_type}")
+                await self._send_message(send_type, send_payload)
+                recv_type, recv_payload = await self._recv_message()
 
-        return recv_payload
+                if recv_type != expected_type:
+                    raise ValueError(f"Expected message type {expected_type}, got {recv_type}")
+
+                return recv_payload
+            except (asyncio.IncompleteReadError, ConnectionResetError, BrokenPipeError) as e:
+                # Connection was broken, disconnect and let next call reconnect
+                if DEBUG >= 3:
+                    print(f"Connection error during send_recv to {self._id}@{self.address}: {e}")
+                await self.disconnect()
+                raise
 
     async def health_check(self) -> bool:
         """Check if peer is healthy."""
@@ -162,8 +167,12 @@ class SocketPeerHandle(PeerHandle):
             )
             return decode_health_check_response(response)
         except asyncio.TimeoutError:
+            # Connection timed out, disconnect to force reconnect on next operation
+            await self.disconnect()
             return False
         except Exception as e:
+            # Connection failed, disconnect to force reconnect on next operation
+            await self.disconnect()
             if DEBUG >= 4:
                 print(f"Health check failed for {self._id}@{self.address}: {e}")
                 import traceback
@@ -178,14 +187,15 @@ class SocketPeerHandle(PeerHandle):
         request_id: Optional[str] = None
     ) -> Optional[MLXArray]:
         """Send prompt to peer."""
-        await self._ensure_connected()
+        async with self._lock:
+            await self._ensure_connected()
 
-        shard_dict = encode_shard(shard.model_id, shard.start_layer, shard.end_layer, shard.n_layers)
-        payload = encode_send_prompt_request(shard_dict, prompt, request_id, inference_state)
+            shard_dict = encode_shard(shard.model_id, shard.start_layer, shard.end_layer, shard.n_layers)
+            payload = encode_send_prompt_request(shard_dict, prompt, request_id, inference_state)
 
-        await self._send_message(MessageType.SEND_PROMPT_REQUEST, payload)
-        # Note: Prompt requests may not return immediately (streaming response)
-        return None
+            await self._send_message(MessageType.SEND_PROMPT_REQUEST, payload)
+            # Note: Prompt requests may not return immediately (streaming response)
+            return None
 
     async def send_tensor(
         self,
@@ -195,8 +205,6 @@ class SocketPeerHandle(PeerHandle):
         request_id: Optional[str] = None
     ) -> Optional[MLXArray]:
         """Send tensor to peer and receive result."""
-        await self._ensure_connected()
-
         shard_dict = encode_shard(shard.model_id, shard.start_layer, shard.end_layer, shard.n_layers)
         tensor_bytes = tensor.tobytes()
         payload = encode_send_tensor_request(
@@ -252,8 +260,6 @@ class SocketPeerHandle(PeerHandle):
 
     async def collect_topology(self, visited: set[str], max_depth: int) -> Topology:
         """Collect topology information from peer."""
-        await self._ensure_connected()
-
         payload = encode_collect_topology_request(visited, max_depth)
         response = await self._send_recv(
             MessageType.COLLECT_TOPOLOGY_REQUEST,
@@ -288,27 +294,29 @@ class SocketPeerHandle(PeerHandle):
 
     async def send_result(self, request_id: str, result: List[int], is_finished: bool) -> None:
         """Send inference result to peer."""
-        await self._ensure_connected()
+        async with self._lock:
+            await self._ensure_connected()
 
-        # Handle tensor results
-        tensor_data = None
-        shape = None
-        dtype = None
-        if isinstance(result, np.ndarray):
-            tensor_data = result.tobytes()
-            shape = result.shape
-            dtype = str(result.dtype)
-            result = []
+            # Handle tensor results
+            tensor_data = None
+            shape = None
+            dtype = None
+            if isinstance(result, np.ndarray):
+                tensor_data = result.tobytes()
+                shape = result.shape
+                dtype = str(result.dtype)
+                result = []
 
-        payload = encode_send_result(request_id, result, is_finished, tensor_data, shape, dtype)
-        await self._send_message(MessageType.SEND_RESULT, payload)
+            payload = encode_send_result(request_id, result, is_finished, tensor_data, shape, dtype)
+            await self._send_message(MessageType.SEND_RESULT, payload)
 
     async def send_opaque_status(self, request_id: str, status: str) -> None:
         """Send opaque status update to peer."""
-        await self._ensure_connected()
+        async with self._lock:
+            await self._ensure_connected()
 
-        payload = encode_send_opaque_status(request_id, status)
-        await self._send_message(MessageType.SEND_OPAQUE_STATUS, payload)
+            payload = encode_send_opaque_status(request_id, status)
+            await self._send_message(MessageType.SEND_OPAQUE_STATUS, payload)
 
     def serialize_inference_state(self, inference_state: dict) -> dict:
         """Serialize inference state (no-op for socket protocol, handled in encoding)."""
